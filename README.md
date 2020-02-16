@@ -1,4 +1,5 @@
 # Checkers in Rust
+## Author: Giuseppe Deininger
 
 Checkers game implemented in Rust
 
@@ -9,7 +10,7 @@ The general rules of checker were applied. Some of them are:
 - Black checkers play first
 - Regular checker can only move forward and one slot per time
 - Regular checkers can only make forward captures
-- When reaching the furthes row, the checker turns into a king
+- When reaching the furthest row, the checker turns into a king
 - The king can move as many slots as desired, both backwards and forward
 - The king can capture checkers over any diagonal line, as long as it lands on an empty slot and captures a single checker per time without going over an ally
 - It is possible to make multiple jumps to capture multiple checkers, as long as the moving limitations are respected
@@ -28,7 +29,7 @@ After that menu, if the Multiplayer mode is selected the board is shown
 
 ![Initial game screen](images/game_screen_1.png)
 
-To move a checker, type the path of its movement, starting with its initial position and adding a coordinate for every land made. The x-coordinate should go first, followes by the y-coordinate. The input is case insensitive, so in the image `e3 f4` yelds the same result as `E3 F4` or any other combination of upper and lower case. After writing the desired path, press `Enter` and it will be applied, as long as it is a valid one.
+To move a checker, type the path of its movement, starting with its initial position and adding a coordinate for every land made. The x-coordinate should go first, followed by the y-coordinate. The input is case insensitive, so in the image `e3 f4` yelds the same result as `E3 F4` or any other combination of upper and lower case. After writing the desired path, press `Enter` and it will be applied, as long as it is a valid one.
 
 ![Game screen after the first move](images/game_screen_2.png)
 
@@ -43,5 +44,7 @@ After the capture is made, the counter on top of the screen is updated with the 
 When a checker turns into a king, it's image change to a different one so that it can be later recognized.
 
 ![Multiple jump input](images/game_screen_5.png)
+
+# End of game
 
 The game ends when one of the colors is out of checkers.
