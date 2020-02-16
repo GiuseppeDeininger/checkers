@@ -4,6 +4,7 @@ use std::collections::HashSet;
 use std::process;
 use std::cmp;
 
+// Create constant values for the possible tiles
 const EMPTY_CHECKER: &'static str = "     ";
 const BLACK_CHECKER: &'static str = "  ○  ";
 const WHITE_CHECKER: &'static str = "  ●  ";
@@ -12,6 +13,7 @@ const WHITE_KING: &'static str = "  ☗  ";
 // const BLACK_KING: &'static str = "  ♔  ";
 // const WHITE_KING: &'static str = "  ♚  ";
 
+// Declare Game structure to be used
 #[derive(Clone)]
 struct Game {
     amount_black_pieces: u8,
@@ -22,12 +24,13 @@ struct Game {
     player_1_black: bool,
 }
 
+// Implement a Game object and fill in the dark_squares with the checkers in their initial position
 impl Game {
     fn new(mode: u8, player_1_black: bool) -> Game {
         let mut dark_squares = HashMap::new();
         for i in 1..9 {
             for j in 0..4 {
-                let mut x_position_num = 65u8;// as char;
+                let mut x_position_num = 65u8;
                 x_position_num += if (i % 2) == 0 {2*j+1} else {(2*j)};
                 let x_position_char = x_position_num as char;
 
@@ -35,7 +38,6 @@ impl Game {
                     dark_squares.insert(format!("{}{}", x_position_char, i), BLACK_CHECKER.to_string());
                 }
                 else if i <= 5 {
-                    //println!("Placing empty at: {}", format!("{}{}", x_position_char, i));
                     dark_squares.insert(format!("{}{}", x_position_char, i), EMPTY_CHECKER.to_string());
                 }
                 else {
@@ -49,11 +51,14 @@ impl Game {
 }
 
 fn main() {
-    let mut game;// = Game::new(1);
+    let mut game;
 
+    // Print menu for the game mode selection and get the user input
     print_menu();
     let choice_mode = get_choice();
     print!("{}[2J", 27 as char);
+
+    // If applicable, print the menu for color selection and get the user input and then create the Game object
     if choice_mode == 1 {
         print_color_selection();
         let choice_color = get_choice();
@@ -62,34 +67,38 @@ fn main() {
     }
     else if choice_mode == 2 {
         game = Game::new(2, true);
-        //get_choice();
     }
     else {
         process::exit(0);
     }
 
-    let mut set: HashSet<String>;
-    set = HashSet::new();
-    //game.dark_squares.insert("D4".to_string(), WHITE_CHECKER.to_string());
+    // Create set to store checkers that can capture and enemy checker
+    let mut checkers_capturing_position: HashSet<String>;
+    checkers_capturing_position = HashSet::new();
+
+    // Main game loop
     loop {
+        // If one of the player is out of checkers, end the game
         if (game.amount_black_pieces == 0) || (game.amount_white_pieces == 0) {
             break;
         }
 
+        // Clear the screem, print the amount of checkers for each side and print the board
         print!("{}[2J", 27 as char);
         println!("White: {}\tBlack: {}", game.amount_white_pieces, game.amount_black_pieces);
         print_screen(game.clone());
 
-        check_mandatory_move(game.clone(), game.black_turn, &mut set);
+        // Check if there is any board able to capture an enemy
+        check_mandatory_move(game.clone(), game.black_turn, &mut checkers_capturing_position);
         
         if game.mode == 1 {
             if game.player_1_black == game.black_turn {
-                if set.is_empty() {
+                if checkers_capturing_position.is_empty() {
                     println!("There are no movement requirements");
                 }
                 else {
                     print!("You need to move one of the following checkers: ");
-                    for value in set.clone() {
+                    for value in checkers_capturing_position.clone() {
                         print!("{} ", value);
                     }
                     println!("");
@@ -99,13 +108,13 @@ fn main() {
                 io::stdout().flush().expect("Error flushing stdout");
                 let mut movement = get_move();
         
-                while !validate_input(game.clone(), game.black_turn, movement.clone(), &set) {
+                while !validate_input(game.clone(), game.black_turn, movement.clone(), &checkers_capturing_position) {
                     print!("{}[2J", 27 as char);
                     println!("White: {}\tBlack: {}", game.amount_white_pieces, game.amount_black_pieces);
                     print_screen(game.clone());
-                    check_mandatory_move(game.clone(), game.black_turn, &mut set);
+                    check_mandatory_move(game.clone(), game.black_turn, &mut checkers_capturing_position);
                     print!("Not a valid movement. You need to move one of the following checkers: ");
-                    for value in set.clone() {
+                    for value in checkers_capturing_position.clone() {
                         print!("{} ", value);
                     }
                     println!("");
@@ -117,17 +126,17 @@ fn main() {
                 game = process_input(game.clone(), movement.clone());
             }
             else {
-                game = make_cpu_movement(game.clone(), game.black_turn, &mut set);
+                game = make_cpu_movement(game.clone(), game.black_turn, &mut checkers_capturing_position);
             }
         }
 
         if game.mode == 2 {
-            if set.is_empty() {
+            if checkers_capturing_position.is_empty() {
                 println!("There are no movement requirements");
             }
             else {
                 print!("You need to move one of the following checkers: ");
-                for value in set.clone() {
+                for value in checkers_capturing_position.clone() {
                     print!("{} ", value);
                 }
                 println!("");
@@ -142,18 +151,18 @@ fn main() {
             io::stdout().flush().expect("Error flushing stdout");
             let mut movement = get_move();
     
-            while !validate_input(game.clone(), game.black_turn, movement.clone(), &set) {
+            while !validate_input(game.clone(), game.black_turn, movement.clone(), &checkers_capturing_position) {
                 print!("{}[2J", 27 as char);
                 println!("White: {}\tBlack: {}", game.amount_white_pieces, game.amount_black_pieces);
                 print_screen(game.clone());
-                //set = check_mandatory_move(game.clone(), true, &mut set);
-                check_mandatory_move(game.clone(), game.black_turn, &mut set);
-                if set.is_empty() {
+            
+                check_mandatory_move(game.clone(), game.black_turn, &mut checkers_capturing_position);
+                if checkers_capturing_position.is_empty() {
                     println!("Not a valid movement, please try again");
                 }
                 else {
                     print!("Not a valid movement. You need to move one of the following checkers: ");
-                    for value in set.clone() {
+                    for value in checkers_capturing_position.clone() {
                         print!("{} ", value);
                     }
                     println!("");
@@ -189,6 +198,7 @@ fn main() {
     }
 }
 
+// Print the board
 fn print_screen(game: Game) {
     println!("    A    B    C    D    E    F    G    H");
     for i in (0..24).rev() {
@@ -220,6 +230,7 @@ fn print_screen(game: Game) {
     println!("    A    B    C    D    E    F    G    H");
 }
 
+// Print the mode selection menu
 fn print_menu() {
     println!("Welcome to Checkers");
     println!("Choose your option:");
@@ -228,6 +239,7 @@ fn print_menu() {
     println!("\t3 - Exit");
 }
 
+// Print the color selection menu
 fn print_color_selection() {
     println!("Which color do you want to play?");
     println!("Choose your option:");
@@ -235,6 +247,7 @@ fn print_color_selection() {
     println!("\t2 - White");
 }
 
+// Get user menu option selection input
 fn get_choice()  -> u8 {
     let mut input = String::new();
     io::stdin().read_line(&mut input).expect("Failed");
@@ -243,6 +256,7 @@ fn get_choice()  -> u8 {
     choice
 }
 
+// Get user move input
 fn get_move() -> String {
     let mut input = String::new();
     io::stdin().read_line(&mut input).expect("Failed");
@@ -267,8 +281,8 @@ fn validate_input(game: Game, black_turn: bool, mut input: String, requirements:
     
     let game_clone = game.clone();
     let initial_checker = &game_clone.dark_squares[&initial_position];
-    let mut current_position :String;// = &path.get(0).unwrap().to_string();
-    let mut current_position_bytes :&[u8];// = current_position.as_bytes();
+    let mut current_position :String;
+    let mut current_position_bytes :&[u8];
     let mut next_position :String;
     let mut next_position_bytes :&[u8];
 
@@ -298,8 +312,8 @@ fn validate_input(game: Game, black_turn: bool, mut input: String, requirements:
                 return false;
             }
 
-            let mut x_diff :u8;
-            let mut y_diff :u8 = next_position_bytes[1] - current_position_bytes[1];
+            let x_diff :u8;
+            let y_diff :u8 = next_position_bytes[1] - current_position_bytes[1];
             // If moving right
             if next_position_bytes[0] > current_position_bytes[0] {
                 x_diff = next_position_bytes[0] - current_position_bytes[0];
@@ -311,7 +325,6 @@ fn validate_input(game: Game, black_turn: bool, mut input: String, requirements:
 
                 // Moved 1 square, should be moving to an empty square
                 if x_diff == 1 {
-                    //println!("Checking empty at: |{}|", next_position);
                     if game_clone.dark_squares[&next_position] != EMPTY_CHECKER {
                         return false;
                     }
@@ -390,8 +403,8 @@ fn validate_input(game: Game, black_turn: bool, mut input: String, requirements:
                 return false;
             }
 
-            let mut x_diff :u8;
-            let mut y_diff :u8 = current_position_bytes[1] - next_position_bytes[1];
+            let x_diff :u8;
+            let y_diff :u8 = current_position_bytes[1] - next_position_bytes[1];
             // If moving right
             if next_position_bytes[0] > current_position_bytes[0] {
                 x_diff = next_position_bytes[0] - current_position_bytes[0];
@@ -572,7 +585,7 @@ fn validate_input(game: Game, black_turn: bool, mut input: String, requirements:
             let mut new_x_position :u8 = current_position_bytes[0];
             let mut new_y_position :u8 = current_position_bytes[1];
             //Up and left
-            for i in 1..(x_diff+1) {
+            for _i in 1..(x_diff+1) {
                 if going_up {
                     new_y_position += 1;
                 }
@@ -617,7 +630,7 @@ fn process_input(mut game: Game, mut input: String) -> Game {
     let initial_checker = &game_clone.dark_squares[&initial_position];
     
     let mut current_position :String = path.get(0).unwrap().to_string();
-    let mut current_position_bytes :&[u8] = current_position.as_bytes();
+    let mut current_position_bytes :&[u8];// = current_position.as_bytes();
     let mut next_position :String = path.get(0).unwrap().to_string();
     let mut next_position_bytes :&[u8] = current_position.as_bytes();
 
@@ -766,256 +779,137 @@ fn process_input(mut game: Game, mut input: String) -> Game {
         }
     }
     
-    //print_screen(game.clone());
-    //get_choice();
     game
 }
 
-fn check_mandatory_move(game: Game, black_turn: bool, checkers_capturing_position: &mut HashSet<String>) {//-> HashSet<String> {
-    // let mut checkers_capturing_position: HashSet<String>;
-    // checkers_capturing_position = HashSet::new();
-    //let mut game_clone = game.clone();
+fn check_mandatory_move(game: Game, black_turn: bool, checkers_capturing_position: &mut HashSet<String>) {
+    // Clear the set to start filling it again
     checkers_capturing_position.clear();
 
+    // Set allies and enemies based on own color
+    let ally_checker :&str = if black_turn {BLACK_CHECKER} else {WHITE_CHECKER};
+    let ally_king :&str = if black_turn {BLACK_KING} else {WHITE_KING};
+
+    // Iterate over the dark squares looking for checkers that can be moved
     for (position, value) in game.clone().dark_squares {
-        if black_turn {
-            if value == BLACK_CHECKER {
-                if check_can_capture(game.clone(), position.clone(), true, false) { checkers_capturing_position.insert(position); }
-            }
-            else if value == BLACK_KING {
-                if check_can_capture(game.clone(), position.clone(), true, true) { checkers_capturing_position.insert(position); }
-            }
+        // When a checker that can be moved is found, check if it can capture an enemy
+        if value == ally_checker {
+            // And add it to the set if so
+            if check_can_capture(game.clone(), position.clone(), black_turn, false) { checkers_capturing_position.insert(position); }
         }
-        else {
-            if value == WHITE_CHECKER {
-                if check_can_capture(game.clone(), position.clone(), false, false) { checkers_capturing_position.insert(position); }
-            }
-            else if value == WHITE_KING {
-                if check_can_capture(game.clone(), position.clone(), false, true) { checkers_capturing_position.insert(position); }
-            }
+        else if value == ally_king {
+            if check_can_capture(game.clone(), position.clone(), black_turn, true) { checkers_capturing_position.insert(position); }
         }
     }
-
-    //checkers_capturing_position
 }
 
 fn check_can_capture(game: Game, initial_position: String, is_black: bool, is_king: bool) -> bool {
-    // println!("{:#?}", initial_position.as_bytes());
-    // println!("{}", initial_position);
+
+    // If is a king, call specialized function on the four possible directions
+    if is_king {
+        // Up and left
+        if check_king_can_capture(game.clone(), initial_position.clone(), is_black, true, true) {return true;}
+        // Up and right
+        if check_king_can_capture(game.clone(), initial_position.clone(), is_black, false, true) {return true;}
+        // Down and left
+        if check_king_can_capture(game.clone(), initial_position.clone(), is_black, true, false) {return true;}
+        // Down and right
+        if check_king_can_capture(game.clone(), initial_position.clone(), is_black, false, false) {return true;}
+        
+        return false;
+    }
+
+    // If not, call specialized function on the two possible directions
+    // Left
+    if check_checker_can_capture(game.clone(), initial_position.clone(), is_black, true) {return true;}
+    // Right
+    if check_checker_can_capture(game.clone(), initial_position.clone(), is_black, false) {return true;}
+
+    false
+}
+
+// Check if the selected king is able to capture an enemy in one of the for possible directions
+fn check_king_can_capture(game: Game, initial_position: String, is_black: bool, going_left: bool, going_up :bool) -> bool {
+    let initial_position_bytes = initial_position.as_bytes();
+    let mut found_opponent :bool = false;
+
+    // Set allies and enemies based on own color
+    let ally_checker :&str = if is_black {BLACK_CHECKER} else {WHITE_CHECKER};
+    let ally_king :&str = if is_black {BLACK_KING} else {WHITE_KING};
+    let opponent_checker :&str = if is_black {WHITE_CHECKER} else {BLACK_CHECKER};
+    let opponent_king :&str = if is_black {WHITE_KING} else {BLACK_KING};
+
+    // Check how far it can go based on own initial position
+    let range_x :u8 = if going_left {initial_position_bytes[0]-65} else {72-initial_position_bytes[0]};
+    let range_y :u8 = if going_up {56-initial_position_bytes[1]} else {initial_position_bytes[1]-49};
+
+    // Set traversing positions
+    let mut new_x_position :u8 = initial_position_bytes[0];
+    let mut new_y_position :u8 = initial_position_bytes[1];
+
+    // Variable to store current iterating tile
+    let mut diagonal;
+    // Follow the selected diagonal until getting to a wall
+    for _i in 1..(cmp::min(range_x, range_y)+1) {
+        // Update position based on the selected direction
+        new_x_position = if going_left {new_x_position - 1} else {new_x_position + 1};
+        new_y_position = if going_up {new_y_position + 1} else {new_y_position - 1};
+
+        // Fecth the tile at the current position
+        diagonal = &game.dark_squares[&format!("{}{}", new_x_position as char, new_y_position as char)];
+        // Cannot jump over an ally, so if couldn't capture an enemy yet, it won't anymore
+        if (diagonal == ally_checker) || (diagonal == ally_king) {
+            return false;
+        }
+        // If found an enemy
+        if (diagonal == opponent_checker) || (diagonal == opponent_king) {
+            // Cannot jump two adjacent enemues, so if couldn't capture an enemy yet, it won't anymore
+            if found_opponent {
+                return false;
+            }
+            // Mark as enemy found for future use
+            else {
+                found_opponent = true;
+            }
+        }
+        // If found an empty square
+        else if diagonal == EMPTY_CHECKER {
+            // If already found an enemy, it means there is a landing spot to capture it
+            if found_opponent {
+                return true;
+            }
+        }
+    }
+
+    // Reached a wall without being able to capture an enemy
+    false
+}
+
+fn check_checker_can_capture(game: Game, initial_position: String, is_black: bool, going_left: bool) -> bool {
     let initial_position_bytes = initial_position.as_bytes();
 
-    let mut diagonal_right_1;
-    let diagonal_right_2;
-    let mut diagonal_left_1;
-    let diagonal_left_2;
+    // Set enemies based on own color
+    let opponent_checker :&str = if is_black {WHITE_CHECKER} else {BLACK_CHECKER};
+    let opponent_king :&str = if is_black {WHITE_KING} else {BLACK_KING};
 
-    if is_black {
-        if !is_king {
-            if initial_position_bytes[0] >= 67 && initial_position_bytes[1] <= 54 {
-                diagonal_left_1 = &game.dark_squares[&format!("{}{}", (initial_position_bytes[0]-1) as char, (initial_position_bytes[1]+1) as char)];
-                diagonal_left_2 = &game.dark_squares[&format!("{}{}", (initial_position_bytes[0]-2) as char, (initial_position_bytes[1]+2) as char)];
-                if (diagonal_left_1 == WHITE_CHECKER || diagonal_left_1 == WHITE_KING) && diagonal_left_2 == EMPTY_CHECKER { return true; }
-            } 
-            if initial_position_bytes[0] <= 70 && initial_position_bytes[1] <= 54 {
-                diagonal_right_1 = &game.dark_squares[&format!("{}{}", (initial_position_bytes[0]+1) as char, (initial_position_bytes[1]+1) as char)];
-                diagonal_right_2 = &game.dark_squares[&format!("{}{}", (initial_position_bytes[0]+2) as char, (initial_position_bytes[1]+2) as char)];
-                if (diagonal_right_1 == WHITE_CHECKER || diagonal_right_1 == WHITE_KING) && diagonal_right_2 == EMPTY_CHECKER { return true; }
-            }
-            else { return false;}
-        }
-        else {
-            let mut found_white :bool = false;
-            //Up and left
-            for i in 1..(cmp::min(initial_position_bytes[0]-65, 56-initial_position_bytes[1])+1) {
-                diagonal_left_1 = &game.dark_squares[&format!("{}{}", (initial_position_bytes[0]-i) as char, (initial_position_bytes[1]+i) as char)];
-                if (diagonal_left_1 == BLACK_CHECKER) || (diagonal_left_1 == BLACK_KING) {
-                    break;
-                }
-                if (diagonal_left_1 == WHITE_CHECKER) || (diagonal_left_1 == WHITE_KING) {
-                    if found_white {
-                        break;
-                    }
-                    else {
-                        found_white = true;
-                    }
-                }
-                else if diagonal_left_1 == EMPTY_CHECKER {
-                    if found_white {
-                        return true;
-                    }
-                }
-            }
-            found_white = false;
-            //Up and right
-            for i in 1..(cmp::min(72-initial_position_bytes[0], 56-initial_position_bytes[1])+1) {
-                diagonal_right_1 = &game.dark_squares[&format!("{}{}", (initial_position_bytes[0]+i) as char, (initial_position_bytes[1]+i) as char)];
-                if (diagonal_right_1 == BLACK_CHECKER) || (diagonal_right_1 == BLACK_KING) {
-                    break;
-                }
-                if (diagonal_right_1 == WHITE_CHECKER) || (diagonal_right_1 == WHITE_KING) {
-                    if found_white {
-                        break;
-                    }
-                    else {
-                        found_white = true;
-                    }
-                }
-                else if diagonal_right_1 == EMPTY_CHECKER {
-                    if found_white {
-                        return true;
-                    }
-                }
-            }
-            found_white = false;
-            //Down and left
-            for i in 1..(cmp::min(initial_position_bytes[0]-65, initial_position_bytes[1]-49)+1) {
-                diagonal_left_1 = &game.dark_squares[&format!("{}{}", (initial_position_bytes[0]-i) as char, (initial_position_bytes[1]-i) as char)];
-                if (diagonal_left_1 == BLACK_CHECKER) || (diagonal_left_1 == BLACK_KING) {
-                    break;
-                }
-                if (diagonal_left_1 == WHITE_CHECKER) || (diagonal_left_1 == WHITE_KING) {
-                    if found_white {
-                        break;
-                    }
-                    else {
-                        found_white = true;
-                    }
-                }
-                else if diagonal_left_1 == EMPTY_CHECKER {
-                    if found_white {
-                        return true;
-                    }
-                }
-            }
-            found_white = false;
-            //Down and right
-            for i in 1..(cmp::min(72-initial_position_bytes[0], initial_position_bytes[1]-49)+1) {
-                diagonal_right_1 = &game.dark_squares[&format!("{}{}", (initial_position_bytes[0]+i) as char, (initial_position_bytes[1]-i) as char)];
-                if (diagonal_right_1 == BLACK_CHECKER) || (diagonal_right_1 == BLACK_KING) {
-                    break;
-                }
-                if (diagonal_right_1 == WHITE_CHECKER) || (diagonal_right_1 == WHITE_KING) {
-                    if found_white {
-                        break;
-                    }
-                    else {
-                        found_white = true;
-                    }
-                }
-                else if diagonal_right_1 == EMPTY_CHECKER {
-                    if found_white {
-                        return true;
-                    }
-                }
-            }
+    // Define possible positions base on selected direction
+    let new_x_1 :u8 = if going_left {initial_position_bytes[0]-1} else {initial_position_bytes[0]+1};
+    let new_x_2 :u8 = if going_left {initial_position_bytes[0]-2} else {initial_position_bytes[0]+2};
+    let new_y_1 :u8 = if is_black {initial_position_bytes[1]+1} else {initial_position_bytes[1]-1};
+    let new_y_2 :u8 = if is_black {initial_position_bytes[1]+2} else {initial_position_bytes[1]-2};
 
-            return false;
-        }
-    }
-    else {
-        if !is_king {
-            if initial_position_bytes[0] >= 67 && initial_position_bytes[1] >= 51 {
-                diagonal_left_1 = &game.dark_squares[&format!("{}{}", (initial_position_bytes[0]-1) as char, (initial_position_bytes[1]-1) as char)];
-                diagonal_left_2 = &game.dark_squares[&format!("{}{}", (initial_position_bytes[0]-2) as char, (initial_position_bytes[1]-2) as char)];
-                if (diagonal_left_1 == BLACK_CHECKER || diagonal_left_1 == BLACK_KING) && diagonal_left_2 == EMPTY_CHECKER { return true; }
-            }
-            if initial_position_bytes[0] <= 70 && initial_position_bytes[1] >= 51 {
-                diagonal_right_1 = &game.dark_squares[&format!("{}{}", (initial_position_bytes[0]+1) as char, (initial_position_bytes[1]-1) as char)];
-                diagonal_right_2 = &game.dark_squares[&format!("{}{}", (initial_position_bytes[0]+2) as char, (initial_position_bytes[1]-2) as char)];
-                if (diagonal_right_1 == BLACK_CHECKER || diagonal_right_1 == BLACK_KING) && diagonal_right_2 == EMPTY_CHECKER { return true; }
-            }
-            else { return false;}
-        }
-        else {
-            let mut found_black :bool = false;
-            //Up and left
-            for i in 1..(cmp::min(initial_position_bytes[0]-65, 56-initial_position_bytes[1])+1) {
-                diagonal_left_1 = &game.dark_squares[&format!("{}{}", (initial_position_bytes[0]-i) as char, (initial_position_bytes[1]+i) as char)];
-                if (diagonal_left_1 == BLACK_CHECKER) || (diagonal_left_1 == BLACK_KING) {
-                    if found_black {
-                        break;
-                    }
-                    else {
-                        found_black = true;
-                    }
-                }
-                if (diagonal_left_1 == WHITE_CHECKER) || (diagonal_left_1 == WHITE_KING) {
-                    break;
-                }
-                else if diagonal_left_1 == EMPTY_CHECKER {
-                    if found_black {
-                        return true;
-                    }
-                }
-            }
-            found_black = false;
-            //Up and right
-            for i in 1..(cmp::min(72-initial_position_bytes[0], 56-initial_position_bytes[1])+1) {
-                diagonal_right_1 = &game.dark_squares[&format!("{}{}", (initial_position_bytes[0]+i) as char, (initial_position_bytes[1]+i) as char)];
-                if (diagonal_right_1 == BLACK_CHECKER) || (diagonal_right_1 == BLACK_KING) {
-                    if found_black {
-                        break;
-                    }
-                    else {
-                        found_black = true;
-                    }
-                }
-                if (diagonal_right_1 == WHITE_CHECKER) || (diagonal_right_1 == WHITE_KING) {
-                    break;
-                }
-                else if diagonal_right_1 == EMPTY_CHECKER {
-                    if found_black {
-                        return true;
-                    }
-                }
-            }
-            found_black = false;
-            //Down and left
-            for i in 1..(cmp::min(initial_position_bytes[0]-65, initial_position_bytes[1]-49)+1) {
-                diagonal_left_1 = &game.dark_squares[&format!("{}{}", (initial_position_bytes[0]-i) as char, (initial_position_bytes[1]-i) as char)];
-                if (diagonal_left_1 == BLACK_CHECKER) || (diagonal_left_1 == BLACK_KING) {
-                    if found_black {
-                        break;
-                    }
-                    else {
-                        found_black = true;
-                    }
-                }
-                if (diagonal_left_1 == WHITE_CHECKER) || (diagonal_left_1 == WHITE_KING) {
-                    break;
-                }
-                else if diagonal_left_1 == EMPTY_CHECKER {
-                    if found_black {
-                        return true;
-                    }
-                }
-            }
-            found_black = false;
-            //Down and right
-            for i in 1..(cmp::min(72-initial_position_bytes[0], initial_position_bytes[1]-49)+1) {
-                diagonal_right_1 = &game.dark_squares[&format!("{}{}", (initial_position_bytes[0]+i) as char, (initial_position_bytes[1]-i) as char)];
-                if (diagonal_right_1 == BLACK_CHECKER) || (diagonal_right_1 == BLACK_KING) {
-                    if found_black {
-                        break;
-                    }
-                    else {
-                        found_black = true;
-                    }
-                }
-                if (diagonal_right_1 == WHITE_CHECKER) || (diagonal_right_1 == WHITE_KING) {
-                    break;
-                }
-                else if diagonal_right_1 == EMPTY_CHECKER {
-                    if found_black {
-                        return true;
-                    }
-                }
-            }
-            
-            return false;
-        }
+    // Check if current position allows to capture an enemy
+    let meets_x_requirement :bool = if going_left {initial_position_bytes[0] >= 67} else {initial_position_bytes[0] <= 70};
+    let meets_y_requirement :bool = if is_black {initial_position_bytes[1] <= 54} else {initial_position_bytes[1] >= 51};
+
+    // If it is possible to capture an enemy, check if it does
+    if meets_x_requirement && meets_y_requirement {
+        let diagonal_1 = &game.dark_squares[&format!("{}{}", new_x_1 as char, new_y_1 as char)];
+        let diagonal_2 = &game.dark_squares[&format!("{}{}", new_x_2 as char, new_y_2 as char)];
+        if (diagonal_1 == opponent_checker || diagonal_1 == opponent_king) && diagonal_2 == EMPTY_CHECKER {return true;}
     }
 
+    // If it didn't return false
     false
 }
 
@@ -1041,6 +935,7 @@ fn check_valid_position (input: String) -> bool {
     true
 }
 
+// TODO implement
 fn make_cpu_movement(game: Game, black_turn: bool, checkers_capturing_position: &mut HashSet<String>) -> Game {
 
     game
