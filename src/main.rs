@@ -72,7 +72,7 @@ fn main() {
         process::exit(0);
     }
 
-    // Create set to store checkers that can capture and enemy checker
+    // Create set to store checkers that can capture and opponent checker
     let mut checkers_capturing_position: HashSet<String>;
     checkers_capturing_position = HashSet::new();
 
@@ -88,7 +88,7 @@ fn main() {
         println!("White: {}\tBlack: {}", game.amount_white_pieces, game.amount_black_pieces);
         print_screen(game.clone());
 
-        // Check if there is any board able to capture an enemy
+        // Check if there is any board able to capture an opponent
         check_mandatory_move(game.clone(), game.black_turn, &mut checkers_capturing_position);
         
         if game.mode == 1 {
@@ -228,7 +228,7 @@ fn print_screen(game: Game) {
 fn print_menu() {
     println!("Welcome to Checkers");
     println!("Choose your option:");
-    println!("\t1 - Single player mode");
+    println!("\t1 - Single player mode (Coming soon!)");
     println!("\t2 - Multiplayer mode");
     println!("\t3 - Exit");
 }
@@ -355,7 +355,7 @@ fn validate_king_input(game: Game, path: Vec<&str>, black_turn: bool, is_black: 
             if (diagonal == opponent_checker) || (diagonal == opponent_king) {
                 // Cannot jump two enemies, so it is invalid
                 if found_opponent { return false; }
-                // Mark as enemy found for future use
+                // Mark as opponent found for future use
                 else { found_opponent = true; }
             }
         }
@@ -586,7 +586,7 @@ fn check_mandatory_move(game: Game, black_turn: bool, checkers_capturing_positio
 
     // Iterate over the dark squares looking for checkers that can be moved
     for (position, value) in game.clone().dark_squares {
-        // When a checker that can be moved is found, check if it can capture an enemy
+        // When a checker that can be moved is found, check if it can capture an opponent
         if value == ally_checker {
             // And add it to the set if so
             if check_can_capture(game.clone(), position.clone(), black_turn, false) { checkers_capturing_position.insert(position); }
@@ -597,7 +597,7 @@ fn check_mandatory_move(game: Game, black_turn: bool, checkers_capturing_positio
     }
 }
 
-// Check if the selected piece is able to capture an enemy in any position
+// Check if the selected piece is able to capture an opponent in any position
 fn check_can_capture(game: Game, initial_position: String, is_black: bool, is_king: bool) -> bool {
 
     // If is a king, call specialized function on the four possible directions
@@ -623,7 +623,7 @@ fn check_can_capture(game: Game, initial_position: String, is_black: bool, is_ki
     false
 }
 
-// Check if the selected king is able to capture an enemy in one of the for possible directions
+// Check if the selected king is able to capture an opponent in one of the for possible directions
 fn check_king_can_capture(game: Game, initial_position: String, is_black: bool, going_left: bool, going_up :bool) -> bool {
     let initial_position_bytes = initial_position.as_bytes();
     let mut found_opponent :bool = false;
@@ -652,29 +652,29 @@ fn check_king_can_capture(game: Game, initial_position: String, is_black: bool, 
 
         // Fecth the tile at the current position
         diagonal = &game.dark_squares[&format!("{}{}", new_x_position as char, new_y_position as char)];
-        // Cannot jump over an ally, so if couldn't capture an enemy yet, it won't anymore
+        // Cannot jump over an ally, so if couldn't capture an opponent yet, it won't anymore
         if (diagonal == ally_checker) || (diagonal == ally_king) { return false; }
 
-        // If found an enemy
+        // If found an opponent
         if (diagonal == opponent_checker) || (diagonal == opponent_king) {
-            // Cannot jump two enemies, so if couldn't capture an enemy yet, it won't anymore
+            // Cannot jump two enemies, so if couldn't capture an opponent yet, it won't anymore
             if found_opponent { return false; }
             
-            // Mark as enemy found for future use
+            // Mark as opponent found for future use
             else { found_opponent = true; }
         }
         // If found an empty square
         else if diagonal == EMPTY_CHECKER {
-            // If already found an enemy, it means there is a landing spot to capture it
+            // If already found an opponent, it means there is a landing spot to capture it
             if found_opponent { return true; }
         }
     }
 
-    // Reached a wall without being able to capture an enemy
+    // Reached a wall without being able to capture an opponent
     false
 }
 
-// Check if the selected checker is able to capture an enemy in one of the for possible directions
+// Check if the selected checker is able to capture an opponent in one of the for possible directions
 fn check_checker_can_capture(game: Game, initial_position: String, is_black: bool, going_left: bool) -> bool {
     let initial_position_bytes = initial_position.as_bytes();
 
@@ -688,11 +688,11 @@ fn check_checker_can_capture(game: Game, initial_position: String, is_black: boo
     let new_y_1 :u8 = if is_black {initial_position_bytes[1]+1} else {initial_position_bytes[1]-1};
     let new_y_2 :u8 = if is_black {initial_position_bytes[1]+2} else {initial_position_bytes[1]-2};
 
-    // Check if current position allows to capture an enemy
+    // Check if current position allows to capture an opponent
     let meets_x_requirement :bool = if going_left {initial_position_bytes[0] >= 67} else {initial_position_bytes[0] <= 70};
     let meets_y_requirement :bool = if is_black {initial_position_bytes[1] <= 54} else {initial_position_bytes[1] >= 51};
 
-    // If it is possible to capture an enemy, check if it does
+    // If it is possible to capture an opponent, check if it does
     if meets_x_requirement && meets_y_requirement {
         let diagonal_1 = &game.dark_squares[&format!("{}{}", new_x_1 as char, new_y_1 as char)];
         let diagonal_2 = &game.dark_squares[&format!("{}{}", new_x_2 as char, new_y_2 as char)];
