@@ -203,19 +203,13 @@ fn print_screen(game: Game) {
     println!("    A    B    C    D    E    F    G    H");
     for i in (0..24).rev() {
         if (i % 3) != 1 {
-            if ((i / 3) % 2) == 0 {
-                println!("       █████     █████     █████     █████    ");
-            }
-            else {
-                println!("  █████     █████     █████     █████       ");
-            }
+            if ((i / 3) % 2) == 0 { println!("       █████     █████     █████     █████    "); }
+            else { println!("  █████     █████     █████     █████       "); }
         }
         else {
             print!("{} ", (i / 3) + 1);
             for j in 0..8 {
-                if ((i + j) % 2) == 0 {
-                    print!("█████");
-                }
+                if ((i + j) % 2) == 0 { print!("█████"); }
                 else {
                     let mut x_position_num = 65u8;
                     x_position_num += j;
@@ -264,360 +258,177 @@ fn get_move() -> String {
     input
 }
 
+// Check if the input is valid
 fn validate_input(game: Game, black_turn: bool, mut input: String, requirements: &HashSet<String>) -> bool {
+    // Remove the line break
     input.pop();
+    // and make everything uppercase
     input = input.to_ascii_uppercase();
-    let path: Vec<&str> = input.split(' ').collect();
-    
-    let initial_position :String = (*path.get(0).unwrap()).to_string();
-    //Check if the initial position is valid and lays inside the board
-    if !check_valid_position(initial_position.clone()) {
-        return false;
-    }
 
-    if !requirements.is_empty() && !requirements.contains(&initial_position) {
-        return false;
-    }
-    
-    let game_clone = game.clone();
-    let initial_checker = &game_clone.dark_squares[&initial_position];
+    // Break the input into individual locations
+    let path: Vec<&str> = input.split(' ').collect();
+
+    // Get the string representing the starting position
+    let initial_position :String = (*path.get(0).unwrap()).to_string();
+
+    //Check if the initial position is valid and lays inside the board
+    if !check_valid_position(initial_position.clone()) { return false; }
+
+    // Check if any move requirement was met
+    if !requirements.is_empty() && !requirements.contains(&initial_position) { return false; }
+
+    // Check the type of checker in the starting position
+    let initial_checker = &game.dark_squares[&initial_position];
+
+    // And call the respective specialized input validator
+    if initial_checker == BLACK_CHECKER { return validate_checker_input(game, path, black_turn, true); }
+    if initial_checker == WHITE_CHECKER { return validate_checker_input(game, path, black_turn, false); }
+    if initial_checker == BLACK_KING { return validate_king_input(game, path, black_turn, true); }
+    if initial_checker == WHITE_KING { return validate_king_input(game, path, black_turn, false); }
+
+    false
+}
+
+// Check if the input is valid for a king
+fn validate_king_input(game: Game, path: Vec<&str>, black_turn: bool, is_black: bool) -> bool {
+    // Set allies and enemies based on own color
+    let ally_checker :&str = if is_black {BLACK_CHECKER} else {WHITE_CHECKER};
+    let ally_king :&str = if is_black {BLACK_KING} else {WHITE_KING};
+    let opponent_checker :&str = if is_black {WHITE_CHECKER} else {BLACK_CHECKER};
+    let opponent_king :&str = if is_black {WHITE_KING} else {BLACK_KING};
+
+    // Declare position variables to be used throughout the path
     let mut current_position :String;
     let mut current_position_bytes :&[u8];
     let mut next_position :String;
     let mut next_position_bytes :&[u8];
 
-    if initial_checker == BLACK_CHECKER {
-        // Checking if it is allowed to move a black checker 
-        if !black_turn {
-            return false;
-        }
+    // Check if it is allowed to move this king color 
+    if black_turn != is_black { return false; }
 
-        for i in 1..path.len() {
-            current_position = (*path.get(i-1).unwrap()).to_string();
-            current_position_bytes = current_position.as_bytes();
-            //Check if the current position is valid and lays inside the board
-            if !check_valid_position(current_position.clone()) {
-                return false;
-            }
-            
-            next_position = (*path.get(i).unwrap()).to_string();
-            next_position_bytes = next_position.as_bytes();
-            //Check if the next position is valid and lays inside the board 
-            if !check_valid_position(next_position.clone()) {
-                return false;
-            }
+    // Iterate over the path
+    for i in 1..path.len() {
+        // Update current position
+        current_position = (*path.get(i-1).unwrap()).to_string();
+        current_position_bytes = current_position.as_bytes();
+        // and check if it is valid and lays inside the board
+        if !check_valid_position(current_position.clone()) { return false; }
+        // Update next position
+        next_position = (*path.get(i).unwrap()).to_string();
+        next_position_bytes = next_position.as_bytes();
+        // and check if it is valid and lays inside the board
+        if !check_valid_position(next_position.clone()) { return false; }
 
-            //Check it is moving forward
-            if next_position_bytes[1] <= current_position_bytes[1] {
-                return false;
-            }
+        // Calculate length and direction of the sub-path
+        let x_diff = cmp::max(current_position_bytes[0], next_position_bytes[0]) - cmp::min(current_position_bytes[0], next_position_bytes[0]);
+        let y_diff = cmp::max(current_position_bytes[1], next_position_bytes[1]) - cmp::min(current_position_bytes[1], next_position_bytes[1]);
 
-            let x_diff :u8;
-            let y_diff :u8 = next_position_bytes[1] - current_position_bytes[1];
-            // If moving right
-            if next_position_bytes[0] > current_position_bytes[0] {
-                x_diff = next_position_bytes[0] - current_position_bytes[0];
+        // Check if it is moving diagonally and if it is actually moving
+        if (x_diff != y_diff) || (x_diff == 0) { return false; }
 
-                // If not moving diagonally to the right
-                if x_diff != y_diff {
-                    return false;
-                }
+        // Check if landing on a non-empty square
+        if game.dark_squares[&next_position] != EMPTY_CHECKER { return false; }
 
-                // Moved 1 square, should be moving to an empty square
-                if x_diff == 1 {
-                    if game_clone.dark_squares[&next_position] != EMPTY_CHECKER {
-                        return false;
-                    }
-                }
-                // Moved 2 squares, should be making a capture
-                else if x_diff == 2 {
-                    if game_clone.dark_squares[&format!("{}{}", (current_position_bytes[0]+1) as char, (current_position_bytes[1]+1) as char)] != WHITE_CHECKER 
-                        && game_clone.dark_squares[&format!("{}{}", (current_position_bytes[0]+1) as char, (current_position_bytes[1]+1) as char)] != WHITE_KING {
-                        return false;
-                    }
-                    if game_clone.dark_squares[&next_position] != EMPTY_CHECKER {
-                        return false;
-                    }
-                }
-                // Moved more than 2 squares, only allowed for kings
-                else {
-                    return false;
-                }
-            }
-            // Else, not moving right
-            else {
-                x_diff = current_position_bytes[0] - next_position_bytes[0];
+        // Calculate the direction of the sub-path
+        let going_up :bool = next_position_bytes[1] > current_position_bytes[1];
+        let going_left :bool = next_position_bytes[0] < current_position_bytes[0];
 
-                //If not moving diagonally to the left
-                if x_diff != y_diff {
-                    return false;
-                }
+        let mut found_opponent :bool = false;
+        // Set traversing positions
+        let mut new_x :u8 = current_position_bytes[0];
+        let mut new_y :u8 = current_position_bytes[1];
 
-                // Moved 1 square, should be moving to an empty square
-                if x_diff == 1 {
-                    if game_clone.dark_squares[&next_position] != EMPTY_CHECKER {
-                        return false;
-                    }
-                }
-                // Moved 2 squares, should be making a capture
-                else if x_diff == 2 {
-                    if game_clone.dark_squares[&format!("{}{}", (current_position_bytes[0]-1) as char, (current_position_bytes[1]+1) as char)] != WHITE_CHECKER 
-                        && game_clone.dark_squares[&format!("{}{}", (current_position_bytes[0]-1) as char, (current_position_bytes[1]+1) as char)] != WHITE_KING {
-                        return false;
-                    }
-                    if game_clone.dark_squares[&next_position] != EMPTY_CHECKER {
-                        return false;
-                    }
-                }
-                // Moved more than 2 squares, only allowed for kings
-                else {
-                    return false;
-                }
+        // Variable to store current iterating tile
+        let mut diagonal :&String;
+        // Iterate over the sub-path
+        for _i in 1..(x_diff+1) {
+            // Calculate the new position based on direction and color
+            new_x = if going_left {new_x - 1} else {new_x + 1};
+            new_y = if going_up {new_y + 1} else {new_y - 1};
+            // and its content
+            diagonal = &game.dark_squares[&format!("{}{}", new_x as char, new_y as char)];
+
+            // Cannot jump over an ally, so it is invalid
+            if (diagonal == ally_checker) || (diagonal == ally_king) { return false; }
+
+            // If found an opponent
+            if (diagonal == opponent_checker) || (diagonal == opponent_king) {
+                // Cannot jump two enemies, so it is invalid
+                if found_opponent { return false; }
+                // Mark as enemy found for future use
+                else { found_opponent = true; }
             }
         }
-
-        return true;
     }
-    if initial_checker == WHITE_CHECKER {
-        // Checking if it is allowed to move a white checker 
-        if black_turn {
-            return false;
+
+    true
+}
+
+// Check if the input is valid for a checker
+fn validate_checker_input(game: Game, path: Vec<&str>, black_turn: bool, is_black: bool) -> bool {
+
+    // Set allies and enemies based on own color
+    let opponent_checker :&str = if is_black {WHITE_CHECKER} else {BLACK_CHECKER};
+    let opponent_king :&str = if is_black {WHITE_KING} else {BLACK_KING};
+
+    // Declare position variables to be used throughout the path
+    let mut current_position :String;
+    let mut current_position_bytes :&[u8];
+    let mut next_position :String;
+    let mut next_position_bytes :&[u8];
+
+    // Check if it is allowed to move this checker color
+    if black_turn != is_black { return false; }
+
+    // Iterate over the path
+    for i in 1..path.len() {
+        // Update current position
+        current_position = (*path.get(i-1).unwrap()).to_string();
+        current_position_bytes = current_position.as_bytes();
+        // and check if it is valid and lays inside the board
+        if !check_valid_position(current_position.clone()) { return false; }
+
+        // Update next position
+        next_position = (*path.get(i).unwrap()).to_string();
+        next_position_bytes = next_position.as_bytes();
+        // and check if it is valid and lays inside the board
+        if !check_valid_position(next_position.clone()) { return false; }
+        
+        // Calculate length and direction of the sub-path
+        let x_diff :u8 = cmp::max(current_position_bytes[0], next_position_bytes[0]) - cmp::min(current_position_bytes[0], next_position_bytes[0]);
+        let y_diff :u8 = cmp::max(current_position_bytes[1], next_position_bytes[1]) - cmp::min(current_position_bytes[1], next_position_bytes[1]);
+        let going_left :bool = next_position_bytes[0] < current_position_bytes[0];
+        let going_up :bool = next_position_bytes[1] > current_position_bytes[1];
+
+        // Check if it is not moving forward
+        if going_up != is_black { return false; }
+
+        // Check if it is not moving diagonally
+        if x_diff != y_diff { return false; }
+
+        // If moved 1 square, should be moving to an empty square
+        if x_diff == 1 {
+            if game.dark_squares[&next_position] != EMPTY_CHECKER { return false; }
         }
 
-        for i in 1..path.len() {
-            current_position = (*path.get(i-1).unwrap()).to_string();
-            current_position_bytes = current_position.as_bytes();
-            //Check if the current position is valid and lays inside the board
-            if !check_valid_position(current_position.clone()) {
-                return false;
-            }
+        // If moved 2 squares, should be making a capture
+        else if x_diff == 2 {
+            // Calculate new position
+            let new_x :u8 = if going_left {current_position_bytes[0] - 1} else {current_position_bytes[0] + 1};
+            let new_y :u8 = if going_up {current_position_bytes[1] + 1} else {current_position_bytes[1] - 1};
+            // Check tile at the new position
+            let diagonal = &game.dark_squares[&format!("{}{}", new_x as char, new_y as char)];
 
-            next_position = (*path.get(i).unwrap()).to_string();
-            next_position_bytes = next_position.as_bytes(); 
-            //Check if the next position is valid and lays inside the board 
-            if !check_valid_position(next_position.clone()) {
-                return false;
-            }
-            //Check it is moving forward
-            if next_position_bytes[1] >= current_position_bytes[1] {
-                return false;
-            }
-
-            let x_diff :u8;
-            let y_diff :u8 = current_position_bytes[1] - next_position_bytes[1];
-            // If moving right
-            if next_position_bytes[0] > current_position_bytes[0] {
-                x_diff = next_position_bytes[0] - current_position_bytes[0];
-
-                // If not moving diagonally to the right
-                if x_diff != y_diff {
-                    return false;
-                }
-
-                // Moved 1 square, should be moving to an empty square
-                if x_diff == 1 {
-                    if game_clone.dark_squares[&next_position] != EMPTY_CHECKER {
-                        return false;
-                    }
-                }
-                // Moved 2 squares, should be making a capture
-                else if x_diff == 2 {
-                    if game_clone.dark_squares[&format!("{}{}", (current_position_bytes[0]+1) as char, (current_position_bytes[1]-1) as char)] != BLACK_CHECKER
-                        && game_clone.dark_squares[&format!("{}{}", (current_position_bytes[0]+1) as char, (current_position_bytes[1]-1) as char)] != BLACK_KING {
-                        return false;
-                    }
-                    if game_clone.dark_squares[&next_position] != EMPTY_CHECKER {
-                        return false;
-                    }
-                }
-                // Moved more than 2 squares, only allowed for kings
-                else {
-                    return false;
-                }
-            }
-            // Else, not moving right
-            else {
-                x_diff = current_position_bytes[0] - next_position_bytes[0];
-
-                //If not moving diagonally to the left
-                if x_diff != y_diff {
-                    return false;
-                }
-
-                // Moved 1 square, should be moving to an empty square
-                if x_diff == 1 {
-                    if game_clone.dark_squares[&next_position] != EMPTY_CHECKER {
-                        return false;
-                    }
-                }
-                // Moved 2 squares, should be making a capture
-                else if x_diff == 2 {
-                    if game_clone.dark_squares[&format!("{}{}", (current_position_bytes[0]-1) as char, (current_position_bytes[1]-1) as char)] != BLACK_CHECKER 
-                        && game_clone.dark_squares[&format!("{}{}", (current_position_bytes[0]-1) as char, (current_position_bytes[1]-1) as char)] != BLACK_KING {
-                        return false;
-                    }
-                    if game_clone.dark_squares[&next_position] != EMPTY_CHECKER {
-                        return false;
-                    }
-                }
-                // Moved more than 2 squares, only allowed for kings
-                else {
-                    return false;
-                }
-            }
+            // Check if the following tile is an opponent
+            if diagonal != opponent_checker && diagonal != opponent_king { return false; }
+            // Check if the final tile is an empty square
+            if game.dark_squares[&next_position] != EMPTY_CHECKER { return false; }
         }
 
-        return true;
+        // Moved more than 2 squares, only allowed for kings
+        else { return false; }
     }
-    if initial_checker == BLACK_KING {
-        // Checking if it is allowed to move a black checker 
-        if !black_turn {
-            return false;
-        }
-
-        for i in 1..path.len() {
-            current_position = (*path.get(i-1).unwrap()).to_string();
-            current_position_bytes = current_position.as_bytes();
-            //Check if the current position is valid and lays inside the board
-            if !check_valid_position(current_position.clone()) {
-                return false;
-            }
-            
-            next_position = (*path.get(i).unwrap()).to_string();
-            next_position_bytes = next_position.as_bytes();
-            //Check if the next position is valid and lays inside the board 
-            if !check_valid_position(next_position.clone()) {
-                return false;
-            }
-
-            let x_diff = cmp::max(current_position_bytes[0], next_position_bytes[0]) - cmp::min(current_position_bytes[0], next_position_bytes[0]);
-            let y_diff = cmp::max(current_position_bytes[1], next_position_bytes[1]) - cmp::min(current_position_bytes[1], next_position_bytes[1]);
-
-            // Check if moving diagonally, and if actually moving
-            if (x_diff != y_diff) || (x_diff == 0) {
-                return false;
-            }
-
-            // Check if landing on a non-empty square
-            if game_clone.dark_squares[&next_position] != EMPTY_CHECKER {
-                return false;
-            }
-
-            let going_up :bool = next_position_bytes[1] > current_position_bytes[1];
-            let going_left :bool = next_position_bytes[0] < current_position_bytes[0];
-
-            let mut found_white :bool = false;
-            let mut diagonal :&String;
-            let mut new_x_position :u8 = current_position_bytes[0];
-            let mut new_y_position :u8 = current_position_bytes[1];
-            //Up and left
-            for _i in 1..(x_diff+1) {
-                if going_up {
-                    new_y_position += 1;
-                }
-                else {
-                    new_y_position -= 1;
-                }
-
-                if going_left {
-                    new_x_position -= 1;
-                }
-                else {
-                    new_x_position += 1;
-                }
-
-                diagonal = &game_clone.dark_squares[&format!("{}{}", (new_x_position) as char, (new_y_position) as char)];
-                if (diagonal == BLACK_CHECKER) || (diagonal == BLACK_KING) {
-                    return false;
-                }
-                if (diagonal == WHITE_CHECKER) || (diagonal == WHITE_KING) {
-                    if found_white {
-                        return false;
-                    }
-                    else {
-                        found_white = true;
-                    }
-                }
-            }
-        }
-
-        return true;
-    }
-    if initial_checker == WHITE_KING {
-        // Checking if it is allowed to move a white checker 
-        if black_turn {
-            return false;
-        }
-
-        for i in 1..path.len() {
-            current_position = (*path.get(i-1).unwrap()).to_string();
-            current_position_bytes = current_position.as_bytes();
-            //Check if the current position is valid and lays inside the board
-            if !check_valid_position(current_position.clone()) {
-                return false;
-            }
-            
-            next_position = (*path.get(i).unwrap()).to_string();
-            next_position_bytes = next_position.as_bytes();
-            //Check if the next position is valid and lays inside the board 
-            if !check_valid_position(next_position.clone()) {
-                return false;
-            }
-
-            let x_diff = cmp::max(current_position_bytes[0], next_position_bytes[0]) - cmp::min(current_position_bytes[0], next_position_bytes[0]);
-            let y_diff = cmp::max(current_position_bytes[1], next_position_bytes[1]) - cmp::min(current_position_bytes[1], next_position_bytes[1]);
-
-            // Check if moving diagonally, and if actually moving
-            if (x_diff != y_diff) || (x_diff == 0) {
-                return false;
-            }
-
-            // Check if landing on a non-empty square
-            if game_clone.dark_squares[&next_position] != EMPTY_CHECKER {
-                return false;
-            }
-
-            let going_up :bool = next_position_bytes[1] > current_position_bytes[1];
-            let going_left :bool = next_position_bytes[0] < current_position_bytes[0];
-
-            let mut found_black :bool = false;
-            let mut diagonal :&String;
-            let mut new_x_position :u8 = current_position_bytes[0];
-            let mut new_y_position :u8 = current_position_bytes[1];
-            //Up and left
-            for _i in 1..(x_diff+1) {
-                if going_up {
-                    new_y_position += 1;
-                }
-                else {
-                    new_y_position -= 1;
-                }
-
-                if going_left {
-                    new_x_position -= 1;
-                }
-                else {
-                    new_x_position += 1;
-                }
-
-                diagonal = &game_clone.dark_squares[&format!("{}{}", (new_x_position) as char, (new_y_position) as char)];
-                if (diagonal == BLACK_CHECKER) || (diagonal == BLACK_KING) {
-                    if found_black {
-                        return false;
-                    }
-                    else {
-                        found_black = true;
-                    }
-                }
-                if (diagonal == WHITE_CHECKER) || (diagonal == WHITE_KING) {
-                    return false;
-                }
-            }
-        }
-
-        return true;
-    }
-    false
+    true
 }
 
 // Apply the move to the Game
@@ -632,16 +443,12 @@ fn process_input(game: Game, mut input: String) -> Game {
     
     // Check the type of checker in the starting position
     let initial_position :String = (*path.get(0).unwrap()).to_string();
-    let game_clone = game.clone();
-    let initial_checker = &game_clone.dark_squares[&initial_position];
+    let initial_checker = &game.dark_squares[&initial_position];
 
     // And call the respective specialized input processor
     if initial_checker == BLACK_CHECKER { return process_checker_input(game, path, true); }
-
     if initial_checker == WHITE_CHECKER { return process_checker_input(game, path, false); }
-
     if initial_checker == BLACK_KING { return process_king_input(game, path, true); }
-
     if initial_checker == WHITE_KING { return process_king_input(game, path, false); }
     
     game
@@ -660,11 +467,9 @@ fn process_king_input(mut game :Game, path: Vec<&str>, is_black: bool) -> Game {
     let mut next_position :String;// = path.get(0).unwrap().to_string();
     let mut next_position_bytes :&[u8];// = current_position.as_bytes();
 
+    // Declare variables to be used throughout the path
     let mut new_x :u8;
     let mut new_y :u8;
-
-    // Create an initial game clone to allow reading the values before the path was applied
-    let game_clone = game.clone();
 
     // Iterate over the path
     for i in 1..path.len() {
@@ -684,7 +489,6 @@ fn process_king_input(mut game :Game, path: Vec<&str>, is_black: bool) -> Game {
         let going_up :bool = next_position_bytes[1] > current_position_bytes[1];
         let going_left :bool = next_position_bytes[0] < current_position_bytes[0];
 
-
         // Set the initial position of the sub-path
         new_x = current_position_bytes[0];
         new_y = current_position_bytes[1];
@@ -693,11 +497,11 @@ fn process_king_input(mut game :Game, path: Vec<&str>, is_black: bool) -> Game {
         
         // Iterate over the sub-path
         for _i in 1..(x_diff+1) {
-            // Calculate the new position based on direction and color
+            // Calculate the new position based on direction
             new_y = if going_up {new_y + 1} else {new_y -1};
             new_x = if going_left {new_x - 1} else {new_x + 1};
             // and its content
-            diagonal = &game_clone.dark_squares[&format!("{}{}", new_x as char, new_y as char)];
+            diagonal = &game.dark_squares[&format!("{}{}", new_x as char, new_y as char)];
             
             // If an opponent is found, it is captured
             if (diagonal == opponent_checker) || (diagonal == opponent_king) {
@@ -764,7 +568,7 @@ fn process_checker_input(mut game :Game, path: Vec<&str>, is_black: bool) -> Gam
     }
 
     // Check if turned into a king
-    if next_position_bytes[1] == 56 {
+    if next_position_bytes[1] == if is_black {56} else {49} {
         game.dark_squares.insert(next_position.clone(), ally_king.to_string());
     }
 
@@ -849,26 +653,20 @@ fn check_king_can_capture(game: Game, initial_position: String, is_black: bool, 
         // Fecth the tile at the current position
         diagonal = &game.dark_squares[&format!("{}{}", new_x_position as char, new_y_position as char)];
         // Cannot jump over an ally, so if couldn't capture an enemy yet, it won't anymore
-        if (diagonal == ally_checker) || (diagonal == ally_king) {
-            return false;
-        }
+        if (diagonal == ally_checker) || (diagonal == ally_king) { return false; }
+
         // If found an enemy
         if (diagonal == opponent_checker) || (diagonal == opponent_king) {
-            // Cannot jump two adjacent enemues, so if couldn't capture an enemy yet, it won't anymore
-            if found_opponent {
-                return false;
-            }
+            // Cannot jump two enemies, so if couldn't capture an enemy yet, it won't anymore
+            if found_opponent { return false; }
+            
             // Mark as enemy found for future use
-            else {
-                found_opponent = true;
-            }
+            else { found_opponent = true; }
         }
         // If found an empty square
         else if diagonal == EMPTY_CHECKER {
             // If already found an enemy, it means there is a landing spot to capture it
-            if found_opponent {
-                return true;
-            }
+            if found_opponent { return true; }
         }
     }
 
@@ -909,21 +707,17 @@ fn check_checker_can_capture(game: Game, initial_position: String, is_black: boo
 fn check_valid_position (input: String) -> bool {
     let input_bytes = input.as_bytes();
     //Check if input has exactly 2 chars (x and y values)
-    if input.len() != 2 {
-        return false;
-    }
+    if input.len() != 2 { return false; }
+
     //Check if x value is outside A-H range
-    if (input_bytes[0] < 65) || (input_bytes[0] > 72) {
-        return false;
-    }
+    if (input_bytes[0] < 65) || (input_bytes[0] > 72) { return false; }
+
     //Check if x value is outside 1-8 range
-    if (input_bytes[1] < 49) || (input_bytes[1] > 56) {
-        return false;
-    }
+    if (input_bytes[1] < 49) || (input_bytes[1] > 56) { return false; }
+
     //Check if it is a dark square
-    if (input_bytes[1] + input_bytes[0]) % 2 != 0 {
-        return false;
-    }
+    if (input_bytes[1] + input_bytes[0]) % 2 != 0 { return false; }
+
     true
 }
 
