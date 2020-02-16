@@ -620,168 +620,158 @@ fn validate_input(game: Game, black_turn: bool, mut input: String, requirements:
     false
 }
 
-fn process_input(mut game: Game, mut input: String) -> Game {
+// Apply the move to the Game
+fn process_input(game: Game, mut input: String) -> Game {
+    // Remove the line break
     input.pop();
+    // and make every letter uppercase
     input = input.to_ascii_uppercase();
+
+    // Break the input into individual locations
     let path: Vec<&str> = input.split(' ').collect();
     
+    // Check the type of checker in the starting position
     let initial_position :String = (*path.get(0).unwrap()).to_string();
     let game_clone = game.clone();
     let initial_checker = &game_clone.dark_squares[&initial_position];
+
+    // And call the respective specialized input processor
+    if initial_checker == BLACK_CHECKER { return process_checker_input(game, path, true); }
+
+    if initial_checker == WHITE_CHECKER { return process_checker_input(game, path, false); }
+
+    if initial_checker == BLACK_KING { return process_king_input(game, path, true); }
+
+    if initial_checker == WHITE_KING { return process_king_input(game, path, false); }
     
+    game
+}
+
+// Apply the move to the Game for a moving checker
+fn process_king_input(mut game :Game, path: Vec<&str>, is_black: bool) -> Game {
+    // Set allies and opponents based on own color
+    let ally_king :&str = if is_black {BLACK_KING} else {WHITE_KING};
+    let opponent_checker :&str = if is_black {WHITE_CHECKER} else {BLACK_CHECKER};
+    let opponent_king :&str = if is_black {WHITE_KING} else {BLACK_KING};
+
+    // Declare position variables to be used throughout the path
+    let mut current_position :String;// = path.get(0).unwrap().to_string();
+    let mut current_position_bytes :&[u8];// = current_position.as_bytes();
+    let mut next_position :String;// = path.get(0).unwrap().to_string();
+    let mut next_position_bytes :&[u8];// = current_position.as_bytes();
+
+    let mut new_x :u8;
+    let mut new_y :u8;
+
+    // Create an initial game clone to allow reading the values before the path was applied
+    let game_clone = game.clone();
+
+    // Iterate over the path
+    for i in 1..path.len() {
+        // Update current and next position
+        current_position = (*path.get(i-1).unwrap()).to_string();
+        current_position_bytes = current_position.as_bytes();
+        next_position = (*path.get(i).unwrap()).to_string();
+        next_position_bytes = next_position.as_bytes();
+
+        // Fill in the starting and ending point with the new values
+        game.dark_squares.insert(current_position.clone(), EMPTY_CHECKER.to_string());
+        game.dark_squares.insert(next_position.clone(), ally_king.to_string());
+
+        // Calculate the distance to be traversed
+        let x_diff = cmp::max(current_position_bytes[0], next_position_bytes[0]) - cmp::min(current_position_bytes[0], next_position_bytes[0]);
+        // and the direction
+        let going_up :bool = next_position_bytes[1] > current_position_bytes[1];
+        let going_left :bool = next_position_bytes[0] < current_position_bytes[0];
+
+
+        // Set the initial position of the sub-path
+        new_x = current_position_bytes[0];
+        new_y = current_position_bytes[1];
+        // and declare a variable for its contents
+        let mut diagonal :&String;
+        
+        // Iterate over the sub-path
+        for _i in 1..(x_diff+1) {
+            // Calculate the new position based on direction and color
+            new_y = if going_up {new_y + 1} else {new_y -1};
+            new_x = if going_left {new_x - 1} else {new_x + 1};
+            // and its content
+            diagonal = &game_clone.dark_squares[&format!("{}{}", new_x as char, new_y as char)];
+            
+            // If an opponent is found, it is captured
+            if (diagonal == opponent_checker) || (diagonal == opponent_king) {
+                // Empty the captured square
+                game.dark_squares.insert(format!("{}{}", new_x as char, new_y as char), EMPTY_CHECKER.to_string());
+
+                // Subtract amount of opponent pieces by one
+                if is_black {game.amount_white_pieces -= 1;} else {game.amount_black_pieces -= 1;}
+                break;
+            }
+        }
+    }
+
+    game
+}
+
+// Apply the move to the Game for a moving checker
+fn process_checker_input(mut game :Game, path: Vec<&str>, is_black: bool) -> Game {    
+    // Set allies and enemies based on own color
+    let ally_checker :&str = if is_black {BLACK_CHECKER} else {WHITE_CHECKER};
+    let ally_king :&str = if is_black {BLACK_KING} else {WHITE_KING};
+
+    // Declare position variables to be used throughout the path
     let mut current_position :String = path.get(0).unwrap().to_string();
     let mut current_position_bytes :&[u8];// = current_position.as_bytes();
     let mut next_position :String = path.get(0).unwrap().to_string();
     let mut next_position_bytes :&[u8] = current_position.as_bytes();
 
-    if initial_checker == BLACK_CHECKER {
-        for i in 1..path.len() {
-            current_position = (*path.get(i-1).unwrap()).to_string();
-            current_position_bytes = current_position.as_bytes();
-            next_position = (*path.get(i).unwrap()).to_string();
-            next_position_bytes = next_position.as_bytes();
+    // Declare direction variable to be used throughout the path
+    let mut going_left :bool;
 
-            game.dark_squares.insert(current_position.clone(), EMPTY_CHECKER.to_string());
-            game.dark_squares.insert(next_position.clone(), BLACK_CHECKER.to_string());
-
-            if (next_position_bytes[1] - current_position_bytes[1]) == 2 {
-                if next_position_bytes[0] > current_position_bytes[0] {
-                    game.dark_squares.insert(format!("{}{}", (current_position_bytes[0]+1) as char, (current_position_bytes[1]+1) as char), EMPTY_CHECKER.to_string());
-                }
-                else {
-                    game.dark_squares.insert(format!("{}{}", (current_position_bytes[0]-1) as char, (current_position_bytes[1]+1) as char), EMPTY_CHECKER.to_string());
-                }
-                
-                game.amount_white_pieces -= 1;
-            }
-
-        }
-
-        //Check if turned into a king
-        if next_position_bytes[1] == 56 {
-            game.dark_squares.insert(next_position.clone(), BLACK_KING.to_string());
-        }
-    }
-
-    if initial_checker == WHITE_CHECKER {
-        for i in 1..path.len() {
-            current_position = (*path.get(i-1).unwrap()).to_string();
-            current_position_bytes = current_position.as_bytes();
-            next_position = (*path.get(i).unwrap()).to_string();
-            next_position_bytes = next_position.as_bytes();
-
-            game.dark_squares.insert(current_position.clone(), EMPTY_CHECKER.to_string());
-            game.dark_squares.insert(next_position.clone(), WHITE_CHECKER.to_string());
-
-            if (current_position_bytes[1] - next_position_bytes[1]) == 2 {
-                if next_position_bytes[0] > current_position_bytes[0] {
-                    game.dark_squares.insert(format!("{}{}", (current_position_bytes[0]+1) as char, (current_position_bytes[1]-1) as char), EMPTY_CHECKER.to_string());
-                }
-                else {
-                    game.dark_squares.insert(format!("{}{}", (current_position_bytes[0]-1) as char, (current_position_bytes[1]-1) as char), EMPTY_CHECKER.to_string());
-                }
-                
-                game.amount_black_pieces -= 1;
-            }
-
-        }
-
-        //Check if turned into a king
-        if next_position_bytes[1] == 49 {
-            game.dark_squares.insert(next_position.clone(), WHITE_KING.to_string());
-        }
-    }
-
-    if initial_checker == BLACK_KING {
-        for i in 1..path.len() {
-            current_position = (*path.get(i-1).unwrap()).to_string();
-            current_position_bytes = current_position.as_bytes();
-            next_position = (*path.get(i).unwrap()).to_string();
-            next_position_bytes = next_position.as_bytes();
-
-            game.dark_squares.insert(current_position.clone(), EMPTY_CHECKER.to_string());
-            game.dark_squares.insert(next_position.clone(), BLACK_KING.to_string());
-
-            let x_diff = cmp::max(current_position_bytes[0], next_position_bytes[0]) - cmp::min(current_position_bytes[0], next_position_bytes[0]);
-            let going_up :bool = next_position_bytes[1] > current_position_bytes[1];
-            let going_left :bool = next_position_bytes[0] < current_position_bytes[0];
-
-            let mut diagonal :&String;
-            let mut new_x_position :u8 = current_position_bytes[0];
-            let mut new_y_position :u8 = current_position_bytes[1];
-            
-            for _i in 1..(x_diff+1) {
-                if going_up {
-                    new_y_position += 1;
-                }
-                else {
-                    new_y_position -= 1;
-                }
-
-                if going_left {
-                    new_x_position -= 1;
-                }
-                else {
-                    new_x_position += 1;
-                }
-
-                diagonal = &game_clone.dark_squares[&format!("{}{}", (new_x_position) as char, (new_y_position) as char)];
-                
-                if (diagonal == WHITE_CHECKER) || (diagonal == WHITE_KING) {
-                    game.dark_squares.insert(format!("{}{}", new_x_position as char, new_y_position as char), EMPTY_CHECKER.to_string());
-                    game.amount_white_pieces -= 1;
-                    break;
-                }
-            }
-        }
-    }
-    if initial_checker == WHITE_KING {
-        for i in 1..path.len() {
-            current_position = (*path.get(i-1).unwrap()).to_string();
-            current_position_bytes = current_position.as_bytes();
-            next_position = (*path.get(i).unwrap()).to_string();
-            next_position_bytes = next_position.as_bytes();
-
-            game.dark_squares.insert(current_position.clone(), EMPTY_CHECKER.to_string());
-            game.dark_squares.insert(next_position.clone(), WHITE_KING.to_string());
-
-            let x_diff = cmp::max(current_position_bytes[0], next_position_bytes[0]) - cmp::min(current_position_bytes[0], next_position_bytes[0]);
-            let going_up :bool = next_position_bytes[1] > current_position_bytes[1];
-            let going_left :bool = next_position_bytes[0] < current_position_bytes[0];
-
-            let mut diagonal :&String;
-            let mut new_x_position :u8 = current_position_bytes[0];
-            let mut new_y_position :u8 = current_position_bytes[1];
-            
-            for _i in 1..(x_diff+1) {
-                if going_up {
-                    new_y_position += 1;
-                }
-                else {
-                    new_y_position -= 1;
-                }
-
-                if going_left {
-                    new_x_position -= 1;
-                }
-                else {
-                    new_x_position += 1;
-                }
-
-                diagonal = &game_clone.dark_squares[&format!("{}{}", (new_x_position) as char, (new_y_position) as char)];
-                
-                if (diagonal == BLACK_CHECKER) || (diagonal == BLACK_KING) {
-                    game.dark_squares.insert(format!("{}{}", new_x_position as char, new_y_position as char), EMPTY_CHECKER.to_string());
-                    game.amount_black_pieces -= 1;
-                    break;
-                }
-            }
-        }
-    }
+    // Declare variables to be used throughout the path
+    let mut new_x :u8;
+    let mut new_y :u8;
     
+    // Iterate over the path
+    for i in 1..path.len() {
+        // Update current and next position
+        current_position = (*path.get(i-1).unwrap()).to_string();
+        current_position_bytes = current_position.as_bytes();
+        next_position = (*path.get(i).unwrap()).to_string();
+        next_position_bytes = next_position.as_bytes();
+
+        // Fill in the starting and ending point with the new values
+        game.dark_squares.insert(current_position.clone(), EMPTY_CHECKER.to_string());
+        game.dark_squares.insert(next_position.clone(), ally_checker.to_string());
+
+        // If moved 2 squares, it means it captured a piece
+        if cmp::max(next_position_bytes[1], current_position_bytes[1]) - cmp::min(next_position_bytes[1], current_position_bytes[1]) == 2 {
+            // Check if it went left or right
+            going_left = if next_position_bytes[0] < current_position_bytes[0] {true} else {false};
+
+            // Calculate the new position based on direction and color
+            new_x = if going_left {current_position_bytes[0]-1} else {current_position_bytes[0]+1};
+            new_y = if is_black {current_position_bytes[1]+1} else {current_position_bytes[1]-1};
+
+            // Empty the captured square
+            game.dark_squares.insert(format!("{}{}", new_x as char, new_y as char), EMPTY_CHECKER.to_string());
+            
+            // Subtract amount of opponent pieces by one
+            if is_black {game.amount_white_pieces -= 1;} else {game.amount_black_pieces -= 1;}
+        }
+
+    }
+
+    // Check if turned into a king
+    if next_position_bytes[1] == 56 {
+        game.dark_squares.insert(next_position.clone(), ally_king.to_string());
+    }
+
     game
 }
 
+// Check if there is any possible capture to be made
 fn check_mandatory_move(game: Game, black_turn: bool, checkers_capturing_position: &mut HashSet<String>) {
     // Clear the set to start filling it again
     checkers_capturing_position.clear();
@@ -803,6 +793,7 @@ fn check_mandatory_move(game: Game, black_turn: bool, checkers_capturing_positio
     }
 }
 
+// Check if the selected piece is able to capture an enemy in any position
 fn check_can_capture(game: Game, initial_position: String, is_black: bool, is_king: bool) -> bool {
 
     // If is a king, call specialized function on the four possible directions
@@ -885,6 +876,7 @@ fn check_king_can_capture(game: Game, initial_position: String, is_black: bool, 
     false
 }
 
+// Check if the selected checker is able to capture an enemy in one of the for possible directions
 fn check_checker_can_capture(game: Game, initial_position: String, is_black: bool, going_left: bool) -> bool {
     let initial_position_bytes = initial_position.as_bytes();
 
