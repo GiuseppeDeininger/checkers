@@ -93,35 +93,14 @@ fn main() {
         
         if game.mode == 1 {
             if game.player_1_black == game.black_turn {
-                if checkers_capturing_position.is_empty() {
-                    println!("There are no movement requirements");
-                }
-                else {
-                    print!("You need to move one of the following checkers: ");
-                    for value in checkers_capturing_position.clone() {
-                        print!("{} ", value);
-                    }
-                    println!("");
-                }
-                
+
+                print_requirements(&checkers_capturing_position);
+
                 print!("Enter your movement order: ");
                 io::stdout().flush().expect("Error flushing stdout");
                 let mut movement = get_move();
         
-                while !validate_input(game.clone(), game.black_turn, movement.clone(), &checkers_capturing_position) {
-                    print!("{}[2J", 27 as char);
-                    println!("White: {}\tBlack: {}", game.amount_white_pieces, game.amount_black_pieces);
-                    print_screen(game.clone());
-                    check_mandatory_move(game.clone(), game.black_turn, &mut checkers_capturing_position);
-                    print!("Not a valid movement. You need to move one of the following checkers: ");
-                    for value in checkers_capturing_position.clone() {
-                        print!("{} ", value);
-                    }
-                    println!("");
-                    print!("Enter your movement order: ");
-                    io::stdout().flush().expect("Error flushing stdout");
-                    movement = get_move();
-                }
+                movement = wait_valid_input(game.clone(), movement.clone(), &mut checkers_capturing_position);
         
                 game = process_input(game.clone(), movement.clone());
             }
@@ -131,47 +110,13 @@ fn main() {
         }
 
         if game.mode == 2 {
-            if checkers_capturing_position.is_empty() {
-                println!("There are no movement requirements");
-            }
-            else {
-                print!("You need to move one of the following checkers: ");
-                for value in checkers_capturing_position.clone() {
-                    print!("{} ", value);
-                }
-                println!("");
-            }
+            print_requirements(&checkers_capturing_position);
 
-            if game.black_turn {
-                print!("Player 1, enter your movement order: ");
-            }
-            else {
-                print!("Player 2, enter your movement order: ");
-            }
+            print!("Player {}, enter your movement order: ", if game.black_turn {1} else {2});
             io::stdout().flush().expect("Error flushing stdout");
             let mut movement = get_move();
     
-            while !validate_input(game.clone(), game.black_turn, movement.clone(), &checkers_capturing_position) {
-                print!("{}[2J", 27 as char);
-                println!("White: {}\tBlack: {}", game.amount_white_pieces, game.amount_black_pieces);
-                print_screen(game.clone());
-            
-                check_mandatory_move(game.clone(), game.black_turn, &mut checkers_capturing_position);
-                if checkers_capturing_position.is_empty() {
-                    println!("Not a valid movement, please try again");
-                }
-                else {
-                    print!("Not a valid movement. You need to move one of the following checkers: ");
-                    for value in checkers_capturing_position.clone() {
-                        print!("{} ", value);
-                    }
-                    println!("");
-                }
-                
-                print!("Enter your movement order: ");
-                io::stdout().flush().expect("Error flushing stdout");
-                movement = get_move();
-            }
+            movement = wait_valid_input(game.clone(), movement.clone(), &mut checkers_capturing_position);
     
             game = process_input(game.clone(), movement.clone());
         }
@@ -179,20 +124,21 @@ fn main() {
         game.black_turn = !game.black_turn;
     }
     
-    
     if game.mode == 1 {
-        if (game.amount_black_pieces == 0) == game.player_1_black {
-            println!("The CPU wins!")
-        }
-        else {
-            println!("You win!")
-        }
+        if (game.amount_black_pieces == 0) == game.player_1_black { println!("The CPU wins!"); }
+        else { println!("You win!"); }
     }
     else if game.mode == 2 {
         if game.amount_white_pieces == 0 {
+            print!("{}[2J", 27 as char);
+            println!("White: {}\tBlack: {}", game.amount_white_pieces, game.amount_black_pieces);
+            print_screen(game.clone());
             println!("Player 1 wins!");
         } 
         else {
+            print!("{}[2J", 27 as char);
+            println!("White: {}\tBlack: {}", game.amount_white_pieces, game.amount_black_pieces);
+            print_screen(game.clone());
             println!("Player 2 wins!");
         }
     }
@@ -231,6 +177,45 @@ fn print_menu() {
     println!("\t1 - Single player mode (Coming soon!)");
     println!("\t2 - Multiplayer mode");
     println!("\t3 - Exit");
+}
+
+fn print_requirements(requirements: &HashSet<String>) {
+    if requirements.is_empty() {
+        println!("There are no movement requirements");
+    }
+    else {
+        print!("You need to move one of the following checkers: ");
+        for value in requirements.clone() {
+            print!("{} ", value);
+        }
+        println!("");
+    }
+}
+
+fn wait_valid_input(game :Game, mut movement :String, requirements: &mut HashSet<String>) -> String {
+    while !validate_input(game.clone(), game.black_turn, movement.clone(), &requirements) {
+        print!("{}[2J", 27 as char);
+        println!("White: {}\tBlack: {}", game.amount_white_pieces, game.amount_black_pieces);
+        print_screen(game.clone());
+    
+        check_mandatory_move(game.clone(), game.black_turn, requirements);
+        if requirements.is_empty() {
+            println!("Not a valid movement, please try again");
+        }
+        else {
+            print!("Not a valid movement. You need to move one of the following checkers: ");
+            for value in requirements.clone() {
+                print!("{} ", value);
+            }
+            println!("");
+        }
+        
+        print!("Enter your movement order: ");
+        io::stdout().flush().expect("Error flushing stdout");
+        movement = get_move();
+    }
+
+    movement
 }
 
 // Print the color selection menu
@@ -721,8 +706,180 @@ fn check_valid_position (input: String) -> bool {
     true
 }
 
-// TODO implement
-fn make_cpu_movement(game: Game, black_turn: bool, checkers_capturing_position: &mut HashSet<String>) -> Game {
+fn make_cpu_movement(game: Game, black_turn: bool, requirements: &HashSet<String>) -> Game {
+    // Set allies and enemies based on own color
+    let ally_checker :&str = if black_turn {BLACK_CHECKER} else {WHITE_CHECKER};
+    let ally_king :&str = if black_turn {BLACK_KING} else {WHITE_KING};
 
-    game
+    let mut movement :String = "".to_string();
+
+    if !requirements.is_empty() {
+        for value in requirements.clone() {
+            let is_king = value == ally_king;
+            movement = format!("{} {}\n", value, get_landing_point(game.clone(), value.clone(), black_turn, is_king));
+            println!("|{}|", format!("{} {}", value, get_landing_point(game.clone(), value.clone(), black_turn, is_king)));
+            return process_input(game.clone(), movement.clone());
+        }
+    }
+
+    // Iterate over the dark squares looking for checkers that can be moved
+    for (position, value) in game.clone().dark_squares {
+        // When a checker that can be moved is found, check if it has an empty neighbour
+        if value == ally_checker || value == ally_king {
+            // And add it to the set if so
+            if check_empty_neighbour(game.clone(), position.clone(), black_turn, true) { movement = format!("{} {}\n", position, get_empty_neihgbour_landing_point(game.clone(), position.clone(), black_turn, true)); println!("{}", movement); break;}
+            if check_empty_neighbour(game.clone(), position.clone(), black_turn, false) { movement = format!("{} {}\n", position, get_empty_neihgbour_landing_point(game.clone(), position.clone(), black_turn, false)); println!("{}", movement); break;}
+        }
+    }
+
+
+    process_input(game.clone(), movement.clone())
+}
+
+// Check if the selected piece is able to capture an opponent in any position
+fn get_landing_point(game: Game, initial_position: String, is_black: bool, is_king: bool) -> String {
+
+    // If is a king, call specialized function on the four possible directions
+    if is_king {
+        // Up and left
+        if check_king_can_capture(game.clone(), initial_position.clone(), is_black, true, true) { return get_king_landing_point(game.clone(), initial_position.clone(), is_black, true, true); }
+        // Up and right
+        if check_king_can_capture(game.clone(), initial_position.clone(), is_black, false, true) { return get_king_landing_point(game.clone(), initial_position.clone(), is_black, false, true); }
+        // Down and left
+        if check_king_can_capture(game.clone(), initial_position.clone(), is_black, true, false) { return get_king_landing_point(game.clone(), initial_position.clone(), is_black, true, false); }
+        // Down and right
+        if check_king_can_capture(game.clone(), initial_position.clone(), is_black, false, false) { return get_king_landing_point(game.clone(), initial_position.clone(), is_black, false, false); }
+        
+        return "".to_string();
+    }
+
+    // If not, call specialized function on the two possible directions
+    // Left
+    if check_checker_can_capture(game.clone(), initial_position.clone(), is_black, true) { return get_checker_landing_point(game.clone(), initial_position.clone(), is_black, true); }
+    // Right
+    if check_checker_can_capture(game.clone(), initial_position.clone(), is_black, false) { return get_checker_landing_point(game.clone(), initial_position.clone(), is_black, false); }
+
+    "".to_string()
+}
+
+// Check if the selected king is able to capture an opponent in one of the for possible directions
+fn get_king_landing_point(game: Game, initial_position: String, is_black: bool, going_left: bool, going_up :bool) -> String {
+    let initial_position_bytes = initial_position.as_bytes();
+    let mut found_opponent :bool = false;
+
+    // Set allies and enemies based on own color
+    let ally_checker :&str = if is_black {BLACK_CHECKER} else {WHITE_CHECKER};
+    let ally_king :&str = if is_black {BLACK_KING} else {WHITE_KING};
+    let opponent_checker :&str = if is_black {WHITE_CHECKER} else {BLACK_CHECKER};
+    let opponent_king :&str = if is_black {WHITE_KING} else {BLACK_KING};
+
+    // Check how far it can go based on own initial position
+    let range_x :u8 = if going_left {initial_position_bytes[0]-65} else {72-initial_position_bytes[0]};
+    let range_y :u8 = if going_up {56-initial_position_bytes[1]} else {initial_position_bytes[1]-49};
+
+    // Set traversing positions
+    let mut new_x_position :u8 = initial_position_bytes[0];
+    let mut new_y_position :u8 = initial_position_bytes[1];
+
+    // Variable to store current iterating tile
+    let mut diagonal;
+    // Follow the selected diagonal until getting to a wall
+    for _i in 1..(cmp::min(range_x, range_y)+1) {
+        // Update position based on the selected direction
+        new_x_position = if going_left {new_x_position - 1} else {new_x_position + 1};
+        new_y_position = if going_up {new_y_position + 1} else {new_y_position - 1};
+
+        // Fecth the tile at the current position
+        diagonal = &game.dark_squares[&format!("{}{}", new_x_position as char, new_y_position as char)];
+        // Cannot jump over an ally, so if couldn't capture an opponent yet, it won't anymore
+        if (diagonal == ally_checker) || (diagonal == ally_king) { return "".to_string(); }
+
+        // If found an opponent
+        if (diagonal == opponent_checker) || (diagonal == opponent_king) {
+            // Cannot jump two enemies, so if couldn't capture an opponent yet, it won't anymore
+            if found_opponent { return "".to_string(); }
+            
+            // Mark as opponent found for future use
+            else { found_opponent = true; }
+        }
+        // If found an empty square
+        else if diagonal == EMPTY_CHECKER {
+            // If already found an opponent, it means there is a landing spot to capture it
+            if found_opponent { return format!("{}{}", new_x_position as char, new_y_position as char); }
+        }
+    }
+
+    // Reached a wall without being able to capture an opponent
+    "".to_string()
+}
+
+// Check if the selected checker is able to capture an opponent in one of the for possible directions
+fn get_checker_landing_point(game: Game, initial_position: String, is_black: bool, going_left: bool) -> String {
+    let initial_position_bytes = initial_position.as_bytes();
+
+    // Set enemies based on own color
+    let opponent_checker :&str = if is_black {WHITE_CHECKER} else {BLACK_CHECKER};
+    let opponent_king :&str = if is_black {WHITE_KING} else {BLACK_KING};
+
+    // Define possible positions base on selected direction
+    let new_x_1 :u8 = if going_left {initial_position_bytes[0]-1} else {initial_position_bytes[0]+1};
+    let new_x_2 :u8 = if going_left {initial_position_bytes[0]-2} else {initial_position_bytes[0]+2};
+    let new_y_1 :u8 = if is_black {initial_position_bytes[1]+1} else {initial_position_bytes[1]-1};
+    let new_y_2 :u8 = if is_black {initial_position_bytes[1]+2} else {initial_position_bytes[1]-2};
+
+    // Check if current position allows to capture an opponent
+    let meets_x_requirement :bool = if going_left {initial_position_bytes[0] >= 67} else {initial_position_bytes[0] <= 70};
+    let meets_y_requirement :bool = if is_black {initial_position_bytes[1] <= 54} else {initial_position_bytes[1] >= 51};
+
+    // If it is possible to capture an opponent, check if it does
+    if meets_x_requirement && meets_y_requirement {
+        let diagonal_1 = &game.dark_squares[&format!("{}{}", new_x_1 as char, new_y_1 as char)];
+        let diagonal_2 = &game.dark_squares[&format!("{}{}", new_x_2 as char, new_y_2 as char)];
+        if (diagonal_1 == opponent_checker || diagonal_1 == opponent_king) && diagonal_2 == EMPTY_CHECKER { return format!("{}{}", new_x_2 as char, new_y_2 as char); }
+    }
+
+    // If it didn't return false
+    "".to_string()
+}
+
+fn check_empty_neighbour(game: Game, initial_position: String, is_black: bool, going_left :bool) -> bool {
+    let initial_position_bytes = initial_position.as_bytes();
+
+    // Define possible positions base on selected direction
+    let new_x_1 :u8 = if going_left {initial_position_bytes[0]-1} else {initial_position_bytes[0]+1};
+    let new_y_1 :u8 = if is_black {initial_position_bytes[1]+1} else {initial_position_bytes[1]-1};
+
+    // Check if current position allows to capture an opponent
+    let meets_x_requirement :bool = if going_left {initial_position_bytes[0] >= 66} else {initial_position_bytes[0] <= 71};
+    let meets_y_requirement :bool = if is_black {initial_position_bytes[1] <= 55} else {initial_position_bytes[1] >= 50};
+
+    // If it is possible to capture an opponent, check if it does
+    if meets_x_requirement && meets_y_requirement {
+        let diagonal_1 = &game.dark_squares[&format!("{}{}", new_x_1 as char, new_y_1 as char)];
+        if diagonal_1 == EMPTY_CHECKER {return true;}
+    }
+
+    // If it didn't return false
+    false
+}
+
+fn get_empty_neihgbour_landing_point(game: Game, initial_position: String, is_black: bool, going_left :bool) -> String {
+    let initial_position_bytes = initial_position.as_bytes();
+
+    // Define possible positions base on selected direction
+    let new_x_1 :u8 = if going_left {initial_position_bytes[0]-1} else {initial_position_bytes[0]+1};
+    let new_y_1 :u8 = if is_black {initial_position_bytes[1]+1} else {initial_position_bytes[1]-1};
+
+    // Check if current position allows to capture an opponent
+    let meets_x_requirement :bool = if going_left {initial_position_bytes[0] >= 66} else {initial_position_bytes[0] <= 71};
+    let meets_y_requirement :bool = if is_black {initial_position_bytes[1] <= 55} else {initial_position_bytes[1] >= 50};
+
+    // If it is possible to capture an opponent, check if it does
+    if meets_x_requirement && meets_y_requirement {
+        let diagonal_1 = &game.dark_squares[&format!("{}{}", new_x_1 as char, new_y_1 as char)];
+        if diagonal_1 == EMPTY_CHECKER {return format!("{}{}", new_x_1 as char, new_y_1 as char);}
+    }
+
+    // If it didn't return false
+    "".to_string()
 }
